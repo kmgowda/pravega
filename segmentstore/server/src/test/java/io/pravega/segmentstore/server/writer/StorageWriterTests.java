@@ -98,7 +98,7 @@ public class StorageWriterTests extends ThreadPooledTestSuite {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
     @Rule
-    public Timeout globalTimeout = Timeout.seconds(TIMEOUT.getSeconds());
+    public Timeout globalTimeout = Timeout.seconds(3 * 60);
 
     @Override
     protected int getThreadPoolSize() {

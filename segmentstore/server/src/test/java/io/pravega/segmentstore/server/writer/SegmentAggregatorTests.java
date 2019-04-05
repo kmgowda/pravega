@@ -90,7 +90,7 @@ public class SegmentAggregatorTests extends ThreadPooledTestSuite {
     private static final int TRANSACTION_COUNT = 10;
     private static final UUID CORE_ATTRIBUTE_ID = Attributes.EVENT_COUNT;
     private static final UUID EXTENDED_ATTRIBUTE_ID = UUID.randomUUID();
-    private static final Duration TIMEOUT = Duration.ofSeconds(20);
+    private static final Duration TIMEOUT = Duration.ofSeconds(30);
     private static final WriterConfig DEFAULT_CONFIG = WriterConfig
             .builder()
             .with(WriterConfig.FLUSH_THRESHOLD_BYTES, 100)
@@ -99,7 +99,7 @@ public class SegmentAggregatorTests extends ThreadPooledTestSuite {
             .with(WriterConfig.MIN_READ_TIMEOUT_MILLIS, 10L)
             .build();
     @Rule
-    public Timeout globalTimeout = Timeout.seconds(TIMEOUT.getSeconds());
+    public Timeout globalTimeout = Timeout.seconds(3 * 60);
 
     @Override
     protected int getThreadPoolSize() {
