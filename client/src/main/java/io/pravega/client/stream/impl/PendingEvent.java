@@ -42,6 +42,11 @@ public class PendingEvent {
      * Callback to be invoked when the data is written.
      */
     private final CompletableFuture<Void> ackFuture;
+
+
+    public final long beginTime;
+    public final long pendingEventTime;
+
        
     private PendingEvent(String routingKey, ByteBuf data, CompletableFuture<Void> ackFuture) {
         Preconditions.checkNotNull(data);
@@ -49,14 +54,34 @@ public class PendingEvent {
         this.routingKey = routingKey;
         this.data = data;
         this.ackFuture = ackFuture;
+        this.beginTime = 0;
+        this.pendingEventTime = 0;
     }
-    
+
+    private PendingEvent(String routingKey, ByteBuf data, CompletableFuture<Void> ackFuture, long beginTime) {
+        Preconditions.checkNotNull(data);
+        Preconditions.checkArgument(data.readableBytes() <= MAX_WRITE_SIZE, "Write size too large: %s", data.readableBytes());
+        this.routingKey = routingKey;
+        this.data = data;
+        this.ackFuture = ackFuture;
+        this.beginTime = beginTime;
+        this.pendingEventTime = System.currentTimeMillis();
+    }
+
+
     public static PendingEvent withHeader(String routingKey, ByteBuffer data, CompletableFuture<Void> ackFuture) {
         ByteBuf eventBuf = new Event(Unpooled.wrappedBuffer(data)).getAsByteBuf();
         return new PendingEvent(routingKey, eventBuf, ackFuture);
         
     }
-    
+
+    public static PendingEvent withHeader(String routingKey, ByteBuffer data, CompletableFuture<Void> ackFuture, long beginTime) {
+        ByteBuf eventBuf = new Event(Unpooled.wrappedBuffer(data)).getAsByteBuf();
+        return new PendingEvent(routingKey, eventBuf, ackFuture, beginTime);
+
+    }
+
+
     public static PendingEvent withoutHeader(String routingKey, ByteBuffer data, CompletableFuture<Void> ackFuture) {
         return new PendingEvent(routingKey, Unpooled.wrappedBuffer(data), ackFuture);
     }

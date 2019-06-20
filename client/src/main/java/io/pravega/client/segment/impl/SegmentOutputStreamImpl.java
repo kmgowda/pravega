@@ -439,7 +439,7 @@ class SegmentOutputStreamImpl implements SegmentOutputStream {
             }
             long eventNumber = state.addToInflight(event);
             try {
-                Append append = new Append(segmentName, writerId, eventNumber, 1, event.getData(), null, requestId);
+                Append append = new Append(segmentName, writerId, eventNumber, 1, event.getData(), null, requestId, event.beginTime, event.pendingEventTime);
                 log.trace("Sending append request: {}", append);
                 connection.send(append);
             } catch (ConnectionFailedException e) {

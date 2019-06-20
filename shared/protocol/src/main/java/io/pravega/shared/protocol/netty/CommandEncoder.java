@@ -21,10 +21,8 @@ import io.pravega.shared.protocol.netty.WireCommands.Padding;
 import io.pravega.shared.protocol.netty.WireCommands.PartialEvent;
 import io.pravega.shared.protocol.netty.WireCommands.SetupAppend;
 import java.io.IOException;
+import java.util.*;
 import java.util.AbstractMap.SimpleImmutableEntry;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
@@ -65,6 +63,7 @@ import static io.pravega.shared.protocol.netty.WireCommands.TYPE_SIZE;
 @Slf4j
 public class CommandEncoder extends MessageToByteEncoder<Object> {
     private static final byte[] LENGTH_PLACEHOLDER = new byte[4];
+    private static final int latencySize = 10000;
     private final Function<Long, AppendBatchSizeTracker> appendTracker;
     private final Map<Map.Entry<String, UUID>, Session> setupSegments = new HashMap<>();
     private AtomicLong tokenCounter = new AtomicLong(0);
@@ -72,6 +71,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
     private UUID writerIdPerformingAppends;
     private int currentBlockSize;
     private int bytesLeftInBlock;
+    private static final latency list = new latency();
 
     @RequiredArgsConstructor
     private static final class Session {
@@ -81,6 +81,99 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         private final long requestId;
     }
 
+    @Slf4j
+    private static final class latency {
+        public int[] begin = new int[latencySize] ;
+        public int[] event = new int[latencySize];
+        public int[] append = new int[latencySize];
+        public int[] total=  new int[latencySize];
+        private boolean print = true;
+        final double[] percentiles = {0.5, 0.75, 0.95, 0.99, 0.999, 0.9999};
+
+
+        public void add(long beginTime, long pendingEventTime, long appendTime){
+            long curTime = System.currentTimeMillis();
+            int diff = (int) (pendingEventTime-beginTime);
+
+            if (diff >= latencySize){
+                 log.error("Invalid pendingEvent time :{} or Begin Time : {}", pendingEventTime, beginTime);
+            } else {
+                begin[diff]++;
+            }
+
+            diff = (int) (appendTime-pendingEventTime);
+            if (diff >= latencySize){
+                log.error("Invalid appendTime : {} or pendingEvent time :{} ", appendTime, pendingEventTime);
+            } else {
+                event[diff]++;
+            }
+
+            diff = (int) (curTime-appendTime);
+            if (diff >= latencySize){
+                log.error("Invalid Encode Time :{} or Invalid appendTime : {}", curTime, appendTime);
+            } else {
+                append[diff]++;
+            }
+
+            diff = (int) (curTime-beginTime);
+            if (diff >= latencySize){
+                log.error("Invalid Encode Time :{} or Invalid begin time : {}", curTime, beginTime);
+            } else {
+                total[diff]++;
+            }
+        }
+
+        private int[] getPercentiles(int[] latencies) {
+            int[] percentileIds = new int[percentiles.length];
+            int[] values = new int[percentileIds.length];
+            int index = 0;
+            int count = 0;
+
+            ArrayList<int[]> latencyRanges = new ArrayList<>();
+            for (int i = 0, cur = 0; i < latencies.length; i++) {
+                if (latencies[i] > 0) {
+                   latencyRanges.add(new int[]{i, cur, cur+latencies[i]});
+                    cur += latencies[i] + 1;
+                    count += latencies[i];
+                }
+            }
+
+
+            for (int i = 0; i < percentiles.length; i++) {
+                percentileIds[i] = (int) (count * percentiles[i]);
+            }
+
+            for (int [] lr : latencyRanges) {
+                while ((index < percentileIds.length) &&
+                        (lr[1] <= percentileIds[index]) && (percentileIds[index] <= lr[2])) {
+                    values[index++] = lr[0];
+                }
+            }
+            return values;
+        }
+
+
+        public void print(){
+            if (print) {
+                print = false;
+                int[] percs = getPercentiles(begin);
+                log.error("Begin percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}",
+                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5]);
+                percs = getPercentiles(event);
+                log.error("Event percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}",
+                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5]);
+                percs = getPercentiles(append);
+                log.error("Append percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}",
+                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5]);
+                percs = getPercentiles(total);
+                log.error("Total percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}",
+                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5]);
+
+            }
+
+        }
+    }
+
     @Override
     protected void encode(ChannelHandlerContext ctx, Object msg, ByteBuf out) throws Exception {
         log.trace("Encoding message to send over the wire {}", msg);
@@ -88,6 +181,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
             Append append = (Append) msg;
             Session session = setupSegments.get(new SimpleImmutableEntry<>(append.segment, append.getWriterId()));
             validateAppend(append, session);
+            list.add(append.beginTime, append.pendingEventTime, append.appendTime);
             if (!append.segment.equals(segmentBeingAppendedTo) || !append.getWriterId().equals(writerIdPerformingAppends)) {
                 breakFromAppend(null, null, out);
             }
@@ -138,6 +232,10 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         } else if (msg instanceof WireCommand) {
             breakFromAppend(null, null, out);
             writeMessage((WireCommand) msg, out);
+            WireCommand cmd = (WireCommand) msg;
+            if (cmd.getType() == WireCommandType.KEEP_ALIVE){
+                list.print();
+            }
         } else {
             throw new IllegalArgumentException("Expected a wire command and found: " + msg);
         }

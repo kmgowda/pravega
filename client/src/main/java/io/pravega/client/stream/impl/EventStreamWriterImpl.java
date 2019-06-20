@@ -109,6 +109,7 @@ public class EventStreamWriterImpl<Type> implements EventStreamWriter<Type>, Tra
     }
     
     private CompletableFuture<Void> writeEventInternal(String routingKey, Type event) {
+        final long beginTime = System.currentTimeMillis();
         Preconditions.checkNotNull(event);
         Exceptions.checkNotClosed(closed.get(), this);
         ByteBuffer data = serializer.serialize(event);
@@ -121,7 +122,7 @@ public class EventStreamWriterImpl<Type> implements EventStreamWriter<Type>, Tra
                     handleMissingLog();
                     segmentWriter = selector.getSegmentOutputStreamForKey(routingKey);
                 }
-                segmentWriter.write(PendingEvent.withHeader(routingKey, data, ackFuture));
+                segmentWriter.write(PendingEvent.withHeader(routingKey, data, ackFuture, beginTime));
             }
         }
         return ackFuture;

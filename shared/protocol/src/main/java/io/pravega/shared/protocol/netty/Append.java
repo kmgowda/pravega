@@ -23,16 +23,29 @@ public class Append implements Request, Comparable<Append> {
     final ByteBuf data;
     final Long expectedLength;
     final long flowId;
+    final long beginTime;
+    final long pendingEventTime;
+    final long appendTime;
 
     public Append(String segment, UUID writerId, long eventNumber, Event event, long flowId) {
-        this(segment, writerId, eventNumber, 1, event.getAsByteBuf(), null, flowId);
+        this(segment, writerId, eventNumber, 1, event.getAsByteBuf(), null, flowId, 0, 0);
     }
     
     public Append(String segment, UUID writerId, long eventNumber, Event event, long expectedLength, long flowId) {
-        this(segment, writerId, eventNumber, 1, event.getAsByteBuf(), expectedLength, flowId);
+        this(segment, writerId, eventNumber, 1, event.getAsByteBuf(), expectedLength, flowId,0,0);
     }
-    
+
     public Append(String segment, UUID writerId, long eventNumber, int eventCount, ByteBuf data, Long expectedLength, long flowId) {
+        this(segment, writerId,eventNumber, eventCount, data, expectedLength, flowId, 0, 0);
+    }
+
+    public Append(String segment, UUID writerId, long eventNumber, Event event, long expectedLength, long flowId, long beginTime, long pendingEventTime) {
+        this(segment, writerId, eventNumber, 1, event.getAsByteBuf(), expectedLength, flowId, beginTime, pendingEventTime);
+    }
+
+
+    public Append(String segment, UUID writerId, long eventNumber, int eventCount, ByteBuf data, Long expectedLength,
+                  long flowId, long beginTime, long pendingEventTime) {
         this.segment = segment;
         this.writerId = writerId;
         this.eventNumber = eventNumber;
@@ -40,6 +53,9 @@ public class Append implements Request, Comparable<Append> {
         this.data = data;
         this.expectedLength = expectedLength;
         this.flowId = flowId;
+        this.beginTime = beginTime;
+        this.pendingEventTime = pendingEventTime;
+        this.appendTime = System.currentTimeMillis();
     }
     
     public int getDataLength() {
