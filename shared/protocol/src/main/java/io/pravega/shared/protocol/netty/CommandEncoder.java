@@ -181,7 +181,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
             if (count > 0) {
                 values[index++] = latencyCount / count;
             } else {
-                values[index++] = 0;
+                values[index++] = -1;
             }
             values[index++] = maxLatency;
             values[index++] = lastIndex;
