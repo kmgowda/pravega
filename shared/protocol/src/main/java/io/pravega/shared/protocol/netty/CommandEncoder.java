@@ -113,6 +113,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         final double[] percentiles = {0.5, 0.75, 0.95, 0.99, 0.999, 0.9999};
 
 
+
         public void add(long beginTime, long pendingEventTime, long appendTime){
             long curTime = System.currentTimeMillis();
             int diff = (int) (pendingEventTime-beginTime);
@@ -147,9 +148,12 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
 
         private int[] getPercentiles(int[] latencies) {
             int[] percentileIds = new int[percentiles.length];
-            int[] values = new int[percentileIds.length];
+            int[] values = new int[percentileIds.length+3];
             int index = 0;
             int count = 0;
+            int eventCount = 0;
+            int maxLatency = 0;
+            int lastIndex = 0;
 
             ArrayList<int[]> latencyRanges = new ArrayList<>();
             for (int i = 0, cur = 0; i < latencies.length; i++) {
@@ -157,6 +161,8 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
                    latencyRanges.add(new int[]{i, cur, cur+latencies[i]});
                     cur += latencies[i] + 1;
                     count += latencies[i];
+                    eventCount++;
+                    maxLatency = Math.max(maxLatency, latencies[i]);
                 }
             }
 
@@ -169,8 +175,12 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
                 while ((index < percentileIds.length) &&
                         (lr[1] <= percentileIds[index]) && (percentileIds[index] <= lr[2])) {
                     values[index++] = lr[0];
+                    lastIndex = lr[1];
                 }
             }
+            values[index++] = maxLatency;
+            values[index++] = lastIndex;
+            values[index++] = eventCount;
             return values;
         }
 
@@ -179,17 +189,17 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
             if (print) {
                 print = false;
                 int[] percs = getPercentiles(begin);
-                log.error("Begin percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}",
-                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5]);
+                log.error("Begin percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, MaxLatency {}, lastIndex {}, Total Events {}",
+                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5], percs[6], percs[7],percs[8]);
                 percs = getPercentiles(event);
-                log.error("Event percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}",
-                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5]);
+                log.error("Event percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, MaxLatency {}, lastIndex {}, Total Events {}",
+                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5], percs[6], percs[7], percs[8]);
                 percs = getPercentiles(append);
-                log.error("Append percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}",
-                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5]);
+                log.error("Append percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, MaxLatency {}, lastIndex {}, Total Events {}",
+                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5],  percs[6], percs[7], percs[8]);
                 percs = getPercentiles(total);
-                log.error("Total percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}",
-                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5]);
+                log.error("Total percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, MaxLatency {}, lastIndex {}, Total Events {}",
+                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5], percs[6], percs[7], percs[8]);
 
             }
 
