@@ -220,7 +220,9 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
             validateAppend(append, session);
             list.add(append.beginTime, append.pendingEventTime, append.appendTime);
             if (!append.segment.equals(segmentBeingAppendedTo) || !append.getWriterId().equals(writerIdPerformingAppends)) {
-                APPEND_BREAKS.writerId++;
+                if (bytesLeftInBlock != 0) {
+                    APPEND_BREAKS.writerId++;
+                }
                 breakFromAppend(null, null, out);
             }
             ByteBuf data = append.getData().slice();
@@ -267,11 +269,15 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         } else if (msg instanceof BlockTimeout) {
             BlockTimeout timeoutMsg = (BlockTimeout) msg;
             if (tokenCounter.get() == timeoutMsg.token) {
-                APPEND_BREAKS.timeout++;
+                if (bytesLeftInBlock != 0) {
+                    APPEND_BREAKS.timeout++;
+                }
                 breakFromAppend(null, null, out);
             }
         } else if (msg instanceof WireCommand) {
-            APPEND_BREAKS.cmd++;
+            if (bytesLeftInBlock != 0) {
+                APPEND_BREAKS.cmd++;
+            }
             breakFromAppend(null, null, out);
             writeMessage((WireCommand) msg, out);
             WireCommand cmd = (WireCommand) msg;
