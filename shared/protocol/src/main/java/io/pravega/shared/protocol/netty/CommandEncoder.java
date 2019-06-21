@@ -93,7 +93,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
 
         public void print(){
             if (print) {
-                print = false;
+               // print = false;
                 log.error("Total append size : {}", total);
                 log.error("append breaks due to writer id mismatch : {}", writerId);
                 log.error("append breaks due to append complete: {}", complete);
@@ -192,7 +192,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
 
         public void print(){
             if (print) {
-                print = false;
+               // print = false;
                 int[] percs = getPercentiles(begin);
                 log.error("Begin percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, Avg latency {}, MaxLatency {}, lastIndex {}, Total Events {}",
                         percs[0], percs[1], percs[2],percs[3], percs[4], percs[5], percs[6], percs[7],percs[8], percs[9]);
