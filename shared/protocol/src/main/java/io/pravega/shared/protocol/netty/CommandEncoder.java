@@ -158,11 +158,11 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
             ArrayList<int[]> latencyRanges = new ArrayList<>();
             for (int i = 0, cur = 0; i < latencies.length; i++) {
                 if (latencies[i] > 0) {
-                   latencyRanges.add(new int[]{i, cur, cur+latencies[i]});
+                    latencyRanges.add(new int[]{i, cur, cur+latencies[i]});
                     cur += latencies[i] + 1;
                     count += latencies[i];
                     eventCount++;
-                    maxLatency = Math.max(maxLatency, latencies[i]);
+                    maxLatency = i;
                 }
             }
 
@@ -180,7 +180,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
             }
             values[index++] = maxLatency;
             values[index++] = lastIndex;
-            values[index++] = eventCount;
+            values[index++] = count;
             return values;
         }
 
