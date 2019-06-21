@@ -89,13 +89,17 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         public long timeout;
         public long cmd;
         public long total;
+        private boolean print = true;
 
         public void print(){
-            log.error("Total append size : {}" ,total);
-            log.error("append breaks due to writer id mismatch : {}", writerId);
-            log.error("append breaks due to append complete: {}", complete);
-            log.error("append breaks due to time out : {}", timeout);
-            log.error("append breaks due to wire command : {}", cmd);
+            if (print) {
+                print = false;
+                log.error("Total append size : {}", total);
+                log.error("append breaks due to writer id mismatch : {}", writerId);
+                log.error("append breaks due to append complete: {}", complete);
+                log.error("append breaks due to time out : {}", timeout);
+                log.error("append breaks due to wire command : {}", cmd);
+            }
         }
     }
 
