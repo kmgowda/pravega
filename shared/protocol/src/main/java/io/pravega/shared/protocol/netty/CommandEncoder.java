@@ -90,15 +90,17 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         public long cmd;
         public long total;
         private boolean print = true;
+        private int iteration = 0;
 
         public void print(){
             if (print) {
                // print = false;
-                log.error("Total append size : {}", total);
-                log.error("append breaks due to writer id mismatch : {}", writerId);
-                log.error("append breaks due to append complete: {}", complete);
-                log.error("append breaks due to time out : {}", timeout);
-                log.error("append breaks due to wire command : {}", cmd);
+                iteration++;
+                log.error("Iteration : {}, Total append size : {}", iteration, total);
+                log.error("Iteration : {}, append breaks due to writer id mismatch : {}", iteration, writerId);
+                log.error("Iteration : {}, append breaks due to append complete: {}", iteration, complete);
+                log.error("Iteration : {}, append breaks due to time out : {}", iteration, timeout);
+                log.error("Iteration : {}, append breaks due to wire command : {}", iteration, cmd);
             }
         }
     }
@@ -111,6 +113,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         public int[] total=  new int[latencySize];
         private boolean print = true;
         final double[] percentiles = {0.5, 0.75, 0.95, 0.99, 0.999, 0.9999};
+        private int iteration = 0;
 
 
 
@@ -193,18 +196,20 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         public void print(){
             if (print) {
                // print = false;
+                iteration++;
+
                 int[] percs = getPercentiles(begin);
-                log.error("Begin percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, Avg latency {}, MaxLatency {}, lastIndex {}, Total Events {}",
-                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5], percs[6], percs[7],percs[8], percs[9]);
+                log.error("Iteration: {}, Begin percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, Avg latency {}, MaxLatency {}, lastIndex {}, Total Events {}",
+                        iteration, percs[0], percs[1], percs[2],percs[3], percs[4], percs[5], percs[6], percs[7],percs[8], percs[9]);
                 percs = getPercentiles(event);
-                log.error("Event percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, Avg latency {}, MaxLatency {}, lastIndex {}, Total Events {}",
-                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5], percs[6], percs[7], percs[8], percs[9]);
+                log.error("Iteration: {}, Event percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, Avg latency {}, MaxLatency {}, lastIndex {}, Total Events {}",
+                        iteration, percs[0], percs[1], percs[2],percs[3], percs[4], percs[5], percs[6], percs[7], percs[8], percs[9]);
                 percs = getPercentiles(append);
-                log.error("Append percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, Avg latency {}, MaxLatency {}, lastIndex {}, Total Events {}",
-                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5],  percs[6], percs[7], percs[8], percs[9]);
+                log.error("Iteration: {}, Append percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, Avg latency {}, MaxLatency {}, lastIndex {}, Total Events {}",
+                        iteration, percs[0], percs[1], percs[2],percs[3], percs[4], percs[5],  percs[6], percs[7], percs[8], percs[9]);
                 percs = getPercentiles(total);
-                log.error("Total percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, Avg latency {}, MaxLatency {}, lastIndex {}, Total Events {}",
-                        percs[0], percs[1], percs[2],percs[3], percs[4], percs[5], percs[6], percs[7], percs[8], percs[9]);
+                log.error("Iteration: {}, Total percentiles 50th {}, 75th {}, 95th {}, 99th {}, 99.9th {} , 99.99th {}, Avg latency {}, MaxLatency {}, lastIndex {}, Total Events {}",
+                        iteration, percs[0], percs[1], percs[2],percs[3], percs[4], percs[5], percs[6], percs[7], percs[8], percs[9]);
 
             }
 
