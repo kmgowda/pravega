@@ -72,6 +72,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
     private int currentBlockSize;
     private int bytesLeftInBlock;
     private static final latency list = new latency();
+    private static final appendBreaks APPEND_BREAKS = new appendBreaks();
 
     @RequiredArgsConstructor
     private static final class Session {
@@ -79,6 +80,23 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         private long lastEventNumber = -1L;
         private int eventCount;
         private final long requestId;
+    }
+
+    @Slf4j
+    private  static final class appendBreaks {
+        public long writerId;
+        public long complete;
+        public long timeout;
+        public long cmd;
+        public long total;
+
+        public void print(){
+            log.error("Total append size : {}" ,total);
+            log.error("append breaks due to writer id mismatch : {}", writerId);
+            log.error("append breaks due to append complete: {}", complete);
+            log.error("append breaks due to time out : {}", timeout);
+            log.error("append breaks due to wire command : {}", cmd);
+        }
     }
 
     @Slf4j
@@ -183,6 +201,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
             validateAppend(append, session);
             list.add(append.beginTime, append.pendingEventTime, append.appendTime);
             if (!append.segment.equals(segmentBeingAppendedTo) || !append.getWriterId().equals(writerIdPerformingAppends)) {
+                APPEND_BREAKS.writerId++;
                 breakFromAppend(null, null, out);
             }
             ByteBuf data = append.getData().slice();
@@ -200,6 +219,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
                 } else {
                     currentBlockSize = msgSize + TYPE_PLUS_LENGTH_SIZE;
                 }
+                APPEND_BREAKS.total+=currentBlockSize;
                 bytesLeftInBlock = currentBlockSize;
                 segmentBeingAppendedTo = append.segment;
                 writerIdPerformingAppends = append.writerId;
@@ -216,6 +236,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
                 bytesLeftInBlock -= msgSize;
             } else {
                 ByteBuf dataInsideBlock = data.readSlice(bytesLeftInBlock - TYPE_PLUS_LENGTH_SIZE);
+                APPEND_BREAKS.complete++;
                 breakFromAppend(dataInsideBlock, data, out);
             }
         } else if (msg instanceof SetupAppend) {
@@ -227,14 +248,17 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         } else if (msg instanceof BlockTimeout) {
             BlockTimeout timeoutMsg = (BlockTimeout) msg;
             if (tokenCounter.get() == timeoutMsg.token) {
+                APPEND_BREAKS.timeout++;
                 breakFromAppend(null, null, out);
             }
         } else if (msg instanceof WireCommand) {
+            APPEND_BREAKS.cmd++;
             breakFromAppend(null, null, out);
             writeMessage((WireCommand) msg, out);
             WireCommand cmd = (WireCommand) msg;
             if (cmd.getType() == WireCommandType.KEEP_ALIVE){
                 list.print();
+                APPEND_BREAKS.print();
             }
         } else {
             throw new IllegalArgumentException("Expected a wire command and found: " + msg);
