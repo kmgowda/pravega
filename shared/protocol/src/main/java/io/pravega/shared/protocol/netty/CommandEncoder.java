@@ -114,6 +114,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         private boolean print = true;
         final double[] percentiles = {0.5, 0.75, 0.95, 0.99, 0.999, 0.9999};
         private int iteration = 0;
+        public int count=0;
 
 
 
@@ -271,6 +272,8 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
             SetupAppend setup = (SetupAppend) msg;
             setupSegments.put(new SimpleImmutableEntry<>(setup.getSegment(), setup.getWriterId()),
                               new Session(setup.getWriterId(), setup.getRequestId()));
+            list.count++;
+
         } else if (msg instanceof BlockTimeout) {
             BlockTimeout timeoutMsg = (BlockTimeout) msg;
             if (tokenCounter.get() == timeoutMsg.token) {
@@ -287,8 +290,11 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
             writeMessage((WireCommand) msg, out);
             WireCommand cmd = (WireCommand) msg;
             if (cmd.getType() == WireCommandType.KEEP_ALIVE){
-                list.print();
-                APPEND_BREAKS.print();
+                list.count--;
+                if (list.count == 0) {
+                    list.print();
+                    APPEND_BREAKS.print();
+                }
             }
         } else {
             throw new IllegalArgumentException("Expected a wire command and found: " + msg);
