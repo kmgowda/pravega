@@ -114,36 +114,34 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         private boolean print = true;
         final double[] percentiles = {0.5, 0.75, 0.95, 0.99, 0.999, 0.9999};
         private int iteration = 0;
-        public int count=0;
-
 
 
         public void add(long beginTime, long pendingEventTime, long appendTime){
             long curTime = System.currentTimeMillis();
             int diff = (int) (pendingEventTime-beginTime);
 
-            if (diff >= latencySize){
+            if (diff >= latencySize || diff < 0){
                  log.error("Invalid pendingEvent time :{} or Begin Time : {}", pendingEventTime, beginTime);
             } else {
                 begin[diff]++;
             }
 
             diff = (int) (appendTime-pendingEventTime);
-            if (diff >= latencySize){
+            if (diff >= latencySize || diff < 0){
                 log.error("Invalid appendTime : {} or pendingEvent time :{} ", appendTime, pendingEventTime);
             } else {
                 event[diff]++;
             }
 
             diff = (int) (curTime-appendTime);
-            if (diff >= latencySize){
+            if (diff >= latencySize || diff < 0){
                 log.error("Invalid Encode Time :{} or Invalid appendTime : {}", curTime, appendTime);
             } else {
                 append[diff]++;
             }
 
             diff = (int) (curTime-beginTime);
-            if (diff >= latencySize){
+            if (diff >= latencySize || diff < 0) {
                 log.error("Invalid Encode Time :{} or Invalid begin time : {}", curTime, beginTime);
             } else {
                 total[diff]++;
@@ -222,49 +220,54 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
         log.trace("Encoding message to send over the wire {}", msg);
         if (msg instanceof Append) {
             Append append = (Append) msg;
-            Session session = setupSegments.get(new SimpleImmutableEntry<>(append.segment, append.getWriterId()));
-            validateAppend(append, session);
-            list.add(append.beginTime, append.pendingEventTime, append.appendTime);
-            if (!append.segment.equals(segmentBeingAppendedTo) || !append.getWriterId().equals(writerIdPerformingAppends)) {
-                if (bytesLeftInBlock != 0) {
-                    APPEND_BREAKS.writerId++;
-                }
-                breakFromAppend(null, null, out);
-            }
-            ByteBuf data = append.getData().slice();
-            int msgSize = data.readableBytes();
-            AppendBatchSizeTracker blockSizeSupplier = null;
-            session.lastEventNumber = append.getEventNumber();
-            session.eventCount++;
-            if (appendTracker != null) {
-                blockSizeSupplier = appendTracker.apply(append.getFlowId());
-                blockSizeSupplier.recordAppend(append.getEventNumber(), msgSize);
-            }
-            if (bytesLeftInBlock == 0) {
-                if (blockSizeSupplier != null) {
-                    currentBlockSize = Math.max(TYPE_PLUS_LENGTH_SIZE, blockSizeSupplier.getAppendBlockSize());
-                } else {
-                    currentBlockSize = msgSize + TYPE_PLUS_LENGTH_SIZE;
-                }
-                APPEND_BREAKS.total+=currentBlockSize;
-                bytesLeftInBlock = currentBlockSize;
-                segmentBeingAppendedTo = append.segment;
-                writerIdPerformingAppends = append.writerId;
-                writeMessage(new AppendBlock(session.id), out);
-                if (ctx != null && blockSizeSupplier != null && currentBlockSize > (msgSize + TYPE_PLUS_LENGTH_SIZE)) {
-                    ctx.executor().schedule(new BlockTimeouter(ctx.channel(), tokenCounter.incrementAndGet()),
-                                            blockSizeSupplier.getBatchTimeout(),
-                                            TimeUnit.MILLISECONDS);
-                }
-            }
-            // Is there enough space for a subsequent message after this one?
-            if (bytesLeftInBlock - msgSize > TYPE_PLUS_LENGTH_SIZE) {
-                out.writeBytes(data);
-                bytesLeftInBlock -= msgSize;
+            if (append.print){
+                        list.print();
+                        APPEND_BREAKS.print();
             } else {
-                ByteBuf dataInsideBlock = data.readSlice(bytesLeftInBlock - TYPE_PLUS_LENGTH_SIZE);
-                APPEND_BREAKS.complete++;
-                breakFromAppend(dataInsideBlock, data, out);
+                Session session = setupSegments.get(new SimpleImmutableEntry<>(append.segment, append.getWriterId()));
+                validateAppend(append, session);
+                list.add(append.beginTime, append.pendingEventTime, append.appendTime);
+                if (!append.segment.equals(segmentBeingAppendedTo) || !append.getWriterId().equals(writerIdPerformingAppends)) {
+                    if (bytesLeftInBlock != 0) {
+                        APPEND_BREAKS.writerId++;
+                    }
+                    breakFromAppend(null, null, out);
+                }
+                ByteBuf data = append.getData().slice();
+                int msgSize = data.readableBytes();
+                AppendBatchSizeTracker blockSizeSupplier = null;
+                session.lastEventNumber = append.getEventNumber();
+                session.eventCount++;
+                if (appendTracker != null) {
+                    blockSizeSupplier = appendTracker.apply(append.getFlowId());
+                    blockSizeSupplier.recordAppend(append.getEventNumber(), msgSize);
+                }
+                if (bytesLeftInBlock == 0) {
+                    if (blockSizeSupplier != null) {
+                        currentBlockSize = Math.max(TYPE_PLUS_LENGTH_SIZE, blockSizeSupplier.getAppendBlockSize());
+                    } else {
+                        currentBlockSize = msgSize + TYPE_PLUS_LENGTH_SIZE;
+                    }
+                    APPEND_BREAKS.total += currentBlockSize;
+                    bytesLeftInBlock = currentBlockSize;
+                    segmentBeingAppendedTo = append.segment;
+                    writerIdPerformingAppends = append.writerId;
+                    writeMessage(new AppendBlock(session.id), out);
+                    if (ctx != null && blockSizeSupplier != null && currentBlockSize > (msgSize + TYPE_PLUS_LENGTH_SIZE)) {
+                        ctx.executor().schedule(new BlockTimeouter(ctx.channel(), tokenCounter.incrementAndGet()),
+                                blockSizeSupplier.getBatchTimeout(),
+                                TimeUnit.MILLISECONDS);
+                    }
+                }
+                // Is there enough space for a subsequent message after this one?
+                if (bytesLeftInBlock - msgSize > TYPE_PLUS_LENGTH_SIZE) {
+                    out.writeBytes(data);
+                    bytesLeftInBlock -= msgSize;
+                } else {
+                    ByteBuf dataInsideBlock = data.readSlice(bytesLeftInBlock - TYPE_PLUS_LENGTH_SIZE);
+                    APPEND_BREAKS.complete++;
+                    breakFromAppend(dataInsideBlock, data, out);
+                }
             }
         } else if (msg instanceof SetupAppend) {
             breakFromAppend(null, null, out);
@@ -272,8 +275,6 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
             SetupAppend setup = (SetupAppend) msg;
             setupSegments.put(new SimpleImmutableEntry<>(setup.getSegment(), setup.getWriterId()),
                               new Session(setup.getWriterId(), setup.getRequestId()));
-            list.count++;
-
         } else if (msg instanceof BlockTimeout) {
             BlockTimeout timeoutMsg = (BlockTimeout) msg;
             if (tokenCounter.get() == timeoutMsg.token) {
@@ -289,14 +290,7 @@ public class CommandEncoder extends MessageToByteEncoder<Object> {
             breakFromAppend(null, null, out);
             writeMessage((WireCommand) msg, out);
             WireCommand cmd = (WireCommand) msg;
-            if (cmd.getType() == WireCommandType.KEEP_ALIVE){
-                list.count--;
-                if (list.count == 0) {
-                    list.print();
-                    APPEND_BREAKS.print();
-                }
-            }
-        } else {
+         } else {
             throw new IllegalArgumentException("Expected a wire command and found: " + msg);
         }
     }

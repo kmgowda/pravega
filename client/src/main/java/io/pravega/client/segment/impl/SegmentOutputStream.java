@@ -49,6 +49,13 @@ public interface SegmentOutputStream extends AutoCloseable {
      */
     public abstract void flush() throws SegmentSealedException;
 
+
+    /**
+     * Block on all writes that have not yet completed.
+     * @throws SegmentSealedException If the segment is closed for modifications.
+     */
+    public abstract void flush(int count) throws SegmentSealedException;
+
     /**
      * Change the state of SegmentOutputStream to sealed to prevent future writes and return the list of unackedEvents.
      * This is invoked by the segmentSealed callback to fetch the unackedEvents to be resent to the right

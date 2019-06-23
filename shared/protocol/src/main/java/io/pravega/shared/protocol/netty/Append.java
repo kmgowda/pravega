@@ -26,26 +26,35 @@ public class Append implements Request, Comparable<Append> {
     final long beginTime;
     final long pendingEventTime;
     final long appendTime;
+    final boolean print;
 
     public Append(String segment, UUID writerId, long eventNumber, Event event, long flowId) {
-        this(segment, writerId, eventNumber, 1, event.getAsByteBuf(), null, flowId, 0, 0);
+        this(segment, writerId, eventNumber, 1, event.getAsByteBuf(), null, flowId, 0, 0, false);
     }
     
     public Append(String segment, UUID writerId, long eventNumber, Event event, long expectedLength, long flowId) {
-        this(segment, writerId, eventNumber, 1, event.getAsByteBuf(), expectedLength, flowId,0,0);
+        this(segment, writerId, eventNumber, 1, event.getAsByteBuf(), expectedLength, flowId,0,0, false);
     }
 
     public Append(String segment, UUID writerId, long eventNumber, int eventCount, ByteBuf data, Long expectedLength, long flowId) {
-        this(segment, writerId,eventNumber, eventCount, data, expectedLength, flowId, 0, 0);
+        this(segment, writerId,eventNumber, eventCount, data, expectedLength, flowId, 0, 0, false);
     }
 
     public Append(String segment, UUID writerId, long eventNumber, Event event, long expectedLength, long flowId, long beginTime, long pendingEventTime) {
-        this(segment, writerId, eventNumber, 1, event.getAsByteBuf(), expectedLength, flowId, beginTime, pendingEventTime);
+        this(segment, writerId, eventNumber, 1, event.getAsByteBuf(), expectedLength, flowId, beginTime, pendingEventTime, false);
     }
 
+    public Append(boolean print){
+        this(null, null, 0, 1, null, 0L, 0, 0, 0, true);
+    }
 
     public Append(String segment, UUID writerId, long eventNumber, int eventCount, ByteBuf data, Long expectedLength,
                   long flowId, long beginTime, long pendingEventTime) {
+        this(segment,writerId,eventNumber,eventCount,data,expectedLength,flowId,beginTime,pendingEventTime,false);
+    }
+
+    public Append(String segment, UUID writerId, long eventNumber, int eventCount, ByteBuf data, Long expectedLength,
+                  long flowId, long beginTime, long pendingEventTime, boolean print) {
         this.segment = segment;
         this.writerId = writerId;
         this.eventNumber = eventNumber;
@@ -56,6 +65,7 @@ public class Append implements Request, Comparable<Append> {
         this.beginTime = beginTime;
         this.pendingEventTime = pendingEventTime;
         this.appendTime = System.currentTimeMillis();
+        this.print = print;
     }
     
     public int getDataLength() {

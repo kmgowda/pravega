@@ -518,7 +518,42 @@ class SegmentOutputStreamImpl implements SegmentOutputStream {
             }
         }
     }
-    
+
+    @Override
+    public void flush(int count) throws SegmentSealedException {
+        int numInflight = state.getNumInflight();
+        log.debug("Flushing writer: {} with {} inflight events", writerId, numInflight);
+        if (numInflight != 0) {
+            try {
+                ClientConnection connection = Futures.getThrowingException(getConnection());
+                connection.send(new KeepAlive());
+                if (count == 0){
+                    connection.send(new Append(true));
+                }
+            } catch (SegmentSealedException | NoSuchSegmentException e) {
+                if (StreamSegmentNameUtils.isTransactionSegment(segmentName)) {
+                    log.warn("Exception observed during a flush on a transaction segment, this indicates that the transaction is " +
+                            "committed/aborted. Details: {}", e.getMessage());
+                    failConnection(e);
+                } else {
+                    log.info("Exception observed while obtaining connection during flush. Details: {} ", e.getMessage());
+                }
+            } catch (Exception e) {
+                failConnection(e);
+            }
+            state.waitForInflight();
+            Exceptions.checkNotClosed(state.isClosed(), this);
+            /* SegmentSealedException is thrown if either of the below conditions are true
+                 - resendToSuccessorsCallback has been invoked.
+                 - the segment corresponds to an aborted Transaction.
+             */
+            if (state.needSuccessors.get() || (StreamSegmentNameUtils.isTransactionSegment(segmentName) && state.isAlreadySealed())) {
+                throw new SegmentSealedException(segmentName + " sealed for writer " + writerId);
+            }
+        }
+    }
+
+
     private void failConnection(Throwable e) {
         log.info("Failing connection for writer {} with exception {}", writerId, e.toString());
         state.failConnection(Exceptions.unwrap(e));

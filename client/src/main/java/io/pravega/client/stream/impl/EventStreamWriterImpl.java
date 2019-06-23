@@ -80,6 +80,7 @@ public class EventStreamWriterImpl<Type> implements EventStreamWriter<Type>, Tra
     private final ConcurrentLinkedQueue<Segment> sealedSegmentQueue = new ConcurrentLinkedQueue<>();
     private final ExecutorService retransmitPool;
     private final Pinger pinger;
+    private static int OPEN_COUNT;
     
     EventStreamWriterImpl(Stream stream, Controller controller, SegmentOutputStreamFactory outputStreamFactory,
                           Serializer<Type> serializer, EventWriterConfig config, ExecutorService retransmitPool,
@@ -95,6 +96,7 @@ public class EventStreamWriterImpl<Type> implements EventStreamWriter<Type>, Tra
         this.pinger = new Pinger(config, stream, controller, internalExecutor);
         List<PendingEvent> failedEvents = selector.refreshSegmentEventWriters(segmentSealedCallBack);
         assert failedEvents.isEmpty() : "There should not be any events to have failed";
+        OPEN_COUNT++;
     }
 
     @Override
@@ -358,13 +360,14 @@ public class EventStreamWriterImpl<Type> implements EventStreamWriter<Type>, Tra
     @Override
     public void flush() {
         Preconditions.checkState(!closed.get());
+        OPEN_COUNT--;
         synchronized (writeFlushLock) {
             boolean success = false;
             while (!success) {
                 success = true;
                 for (SegmentOutputStream writer : selector.getWriters()) {
                     try {
-                        writer.flush();
+                        writer.flush(OPEN_COUNT);
                     } catch (SegmentSealedException e) {
                         // Segment sealed exception observed during a flush. Re-run flush on all the
                         // available writers.
