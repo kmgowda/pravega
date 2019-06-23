@@ -169,6 +169,11 @@ public class MockSegmentIoStreams implements SegmentOutputStream, SegmentInputSt
     }
 
     @Override
+    public void flush(int count) throws SegmentSealedException {
+        //Noting to do.
+    }
+
+    @Override
     public boolean isSegmentReady() {
         return true;
     }

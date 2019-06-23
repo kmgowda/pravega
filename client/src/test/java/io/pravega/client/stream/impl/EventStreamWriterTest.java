@@ -191,6 +191,11 @@ public class EventStreamWriterTest extends ThreadPooledTestSuite {
         }
 
         @Override
+        public void flush(int count) throws SegmentSealedException {
+            flush();
+        }
+
+        @Override
         public List<PendingEvent> getUnackedEventsOnSeal() {
             sealed = true;
             return Collections.unmodifiableList(unacked);
@@ -235,6 +240,11 @@ public class EventStreamWriterTest extends ThreadPooledTestSuite {
             //flushLatch is used to simulate a blocking Flush(). .
             Exceptions.handleInterrupted(() -> flushLatch.await());
             throw new SegmentSealedException(segment.toString());
+        }
+
+        @Override
+        public void flush(int count) throws SegmentSealedException {
+            flush();
         }
 
         @Override
